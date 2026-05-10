@@ -1,0 +1,1858 @@
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║                                                                      ║
+  ║   IG CHECKER · Auditoría de Instagram que abrís con tu IDE          ║
+  ║                                                                      ║
+  ║   Single-file HTML. Sin servidor. Sin login. Sin tracking.          ║
+  ║   Procesa el export oficial de Instagram (JSON) localmente.         ║
+  ║                                                                      ║
+  ║   Repo:    https://github.com/curetcore/ig-checker                  ║
+  ║   Autor:   @_ronaldopaulino · linkship.cc · karrito.shop            ║
+  ║   Licencia: MIT                                                     ║
+  ║                                                                      ║
+  ║   ─── ESTRUCTURA DEL ARCHIVO ─────────────────────────────────────── ║
+  ║   <head>           Meta SEO + JSON-LD + estilos                      ║
+  ║   <body>           HTML (header → hero → dropzone → stats → lista)   ║
+  ║   <script>         Lógica JS organizada en bloques:                  ║
+  ║                      · Constants & state (~ línea 972)               ║
+  ║                      · Storage helpers   (~ línea 1017)              ║
+  ║                      · Toast / error     (~ línea 1044)              ║
+  ║                      · Zip parsing       (~ línea 1127)              ║
+  ║                      · Render            (~ línea 1431)              ║
+  ║                                                                      ║
+  ║   ─── CÓMO MODIFICARLO CON CLAUDE CODE ───────────────────────────── ║
+  ║   Abrí este archivo y pedile a Claude lo que quieras:                ║
+  ║   · "agregá filtro de cuentas verificadas"                           ║
+  ║   · "exportá la lista a CSV"                                         ║
+  ║   · "cambiá el tema a oscuro"                                        ║
+  ║   · "agregá soporte para TikTok"                                     ║
+  ║   Claude lee este header y entiende el código en segundos.          ║
+  ║                                                                      ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+-->
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IG Checker — Quién no te sigue en Instagram (100% local)</title>
+<meta name="description" content="Auditor de seguidores de Instagram que corre 100% en tu navegador. Sin login, sin tracking, sin servidor. Procesá el export oficial de Instagram y descubrí quién no te sigue de vuelta." />
+<meta name="keywords" content="instagram unfollowers, no te sigue, quien no me sigue, instagram audit, instagram checker, mutual followers, export instagram, 100% local, sin login" />
+<meta name="author" content="Ronaldo Paulino" />
+<meta name="robots" content="index, follow" />
+<link rel="canonical" href="https://github.com/curetcore/ig-checker" />
+
+<!-- Open Graph -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="IG Checker — Quién no te sigue en Instagram" />
+<meta property="og:description" content="Auditor de seguidores de Instagram, 100% local. Sin login. Open source. Abrílo con Claude Code y customizalo." />
+<meta property="og:url" content="https://github.com/curetcore/ig-checker" />
+<meta property="og:site_name" content="IG Checker" />
+<meta property="og:locale" content="es_ES" />
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="IG Checker — Quién no te sigue en Instagram" />
+<meta name="twitter:description" content="Auditor 100% local. Sin login. Open source. Abrílo con tu IDE." />
+
+<!-- JSON-LD: SoftwareApplication -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "IG Checker",
+  "description": "Auditor de seguidores de Instagram que corre 100% en tu navegador. Sin login, sin tracking, sin servidor.",
+  "applicationCategory": "UtilityApplication",
+  "operatingSystem": "Any (browser-based)",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": {
+    "@type": "Person",
+    "name": "Ronaldo Paulino",
+    "url": "https://www.threads.com/@ronaldships"
+  },
+  "codeRepository": "https://github.com/curetcore/ig-checker",
+  "license": "https://opensource.org/licenses/MIT",
+  "inLanguage": "es"
+}
+</script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='22'%3E🪞%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --bg: #f8f7f4;
+    --bg-grain: #f5f4f0;
+    --surface: #ffffff;
+    --surface-2: #fcfbf8;
+    --ink: #0a0a0a;
+    --ink-2: #2a2a2a;
+    --mute: #71717a;
+    --mute-2: #a1a1aa;
+    --line: rgba(10, 10, 10, 0.08);
+    --line-2: rgba(10, 10, 10, 0.04);
+    --accent: #ff3030;
+    --accent-soft: rgba(255, 48, 48, 0.08);
+    --accent-soft-2: rgba(255, 48, 48, 0.14);
+    --success: #18a957;
+    --success-soft: rgba(24, 169, 87, 0.08);
+    --warm: #f59e0b;
+    --warm-soft: rgba(245, 158, 11, 0.10);
+    --shadow-xs: 0 1px 2px rgba(10, 10, 10, 0.04);
+    --shadow-sm: 0 2px 8px rgba(10, 10, 10, 0.04), 0 1px 2px rgba(10, 10, 10, 0.04);
+    --shadow-md: 0 8px 24px rgba(10, 10, 10, 0.06), 0 2px 6px rgba(10, 10, 10, 0.04);
+    --shadow-lg: 0 24px 64px rgba(10, 10, 10, 0.08);
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  *::selection { background: var(--ink); color: var(--bg); }
+
+  html, body {
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+
+  body {
+    min-height: 100dvh;
+    background:
+      radial-gradient(800px 400px at 0% 0%, rgba(255, 48, 48, 0.04), transparent 60%),
+      radial-gradient(900px 500px at 100% 30%, rgba(255, 200, 100, 0.06), transparent 60%),
+      var(--bg);
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: 0.6;
+    z-index: 0;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px 96px; position: relative; z-index: 1; }
+
+  /* ================ HEADER ================ */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 56px;
+  }
+
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 600; font-size: 16px; letter-spacing: -0.01em;
+  }
+  .brand-mark {
+    font-family: 'Instrument Serif', serif;
+    font-size: 28px;
+    font-style: italic;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--ink) 0%, var(--accent) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    letter-spacing: -0.02em;
+  }
+  .brand-name { font-weight: 600; }
+  .brand-divider { width: 1px; height: 16px; background: var(--line); }
+  .brand-tag { font-size: 13px; color: var(--mute); font-weight: 400; }
+
+  .header-actions { display: flex; align-items: center; gap: 12px; }
+  .pill-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 11px; border-radius: 999px;
+    background: var(--success-soft); color: var(--success);
+    font-size: 12px; font-weight: 500;
+    border: 1px solid rgba(24, 169, 87, 0.16);
+  }
+  .pill-status::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 0 0 rgba(24, 169, 87, 0.6);
+    animation: pulse 2s var(--ease) infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(24, 169, 87, 0.5); }
+    70% { box-shadow: 0 0 0 6px rgba(24, 169, 87, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(24, 169, 87, 0); }
+  }
+
+  .icon-btn {
+    width: 36px; height: 36px;
+    display: grid; place-items: center;
+    background: transparent; border: 1px solid var(--line);
+    border-radius: 10px;
+    color: var(--ink-2); cursor: pointer;
+    transition: background 0.18s var(--ease), border-color 0.18s var(--ease), color 0.18s var(--ease);
+  }
+  .icon-btn:hover { background: var(--surface); border-color: rgba(10, 10, 10, 0.16); color: var(--ink); }
+
+  /* ================ HERO ================ */
+  .hero {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 48px;
+    align-items: end;
+    margin-bottom: 64px;
+  }
+  .hero-eyebrow {
+    font-size: 12px; font-weight: 500;
+    color: var(--mute); text-transform: uppercase; letter-spacing: 0.14em;
+    margin-bottom: 24px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .hero-eyebrow::before {
+    content: ''; width: 24px; height: 1px; background: var(--ink);
+  }
+  .hero h1 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: clamp(48px, 7vw, 84px);
+    line-height: 0.96;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+  }
+  .hero h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+  .hero-sub {
+    font-size: 17px; color: var(--mute); line-height: 1.5;
+    max-width: 460px;
+  }
+
+  .hero-side {
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .hero-fact {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px dashed var(--line);
+    font-size: 14px;
+  }
+  .hero-fact:last-child { border-bottom: none; }
+  .hero-fact-icon {
+    width: 28px; height: 28px;
+    display: grid; place-items: center;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+    flex-shrink: 0;
+    align-self: flex-start;
+  }
+  .hero-fact strong { font-weight: 600; color: var(--ink); }
+  .hero-fact-text { color: var(--mute); line-height: 1.5; }
+
+  /* ================ ERROR ================ */
+  .error-card {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-soft-2);
+    color: var(--accent);
+    padding: 14px 18px;
+    border-radius: 12px;
+    font-size: 14px;
+    margin-bottom: 24px;
+    display: none;
+    animation: slideDown 0.4s var(--ease-out);
+  }
+  .error-card.show { display: flex; align-items: flex-start; gap: 10px; }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ================ DROPZONE ================ */
+  .dropzone-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 28px;
+    padding: 8px;
+    box-shadow: var(--shadow-md);
+    transition: box-shadow 0.3s var(--ease);
+  }
+  .dropzone-card:hover { box-shadow: var(--shadow-lg); }
+
+  .dropzone {
+    border: 2px dashed rgba(10, 10, 10, 0.12);
+    border-radius: 22px;
+    padding: 48px 32px 40px;
+    cursor: pointer;
+    transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+    position: relative;
+    overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .dropzone::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 48, 48, 0.05) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s var(--ease);
+    pointer-events: none;
+  }
+  .dropzone:hover, .dropzone.dragover { border-color: var(--accent); }
+  .dropzone:hover::before, .dropzone.dragover::before { opacity: 1; }
+  .dropzone.dragover { border-style: solid; }
+  .dropzone > * { position: relative; }
+
+  .dropzone-icon {
+    width: 56px; height: 56px; margin-bottom: 20px;
+    border-radius: 16px;
+    background: var(--ink);
+    display: grid; place-items: center;
+    color: var(--bg);
+    transition: transform 0.5s var(--ease-out), background 0.3s var(--ease);
+    box-shadow: 0 8px 20px rgba(10, 10, 10, 0.15);
+  }
+  .dropzone:hover .dropzone-icon { transform: translateY(-3px) rotate(-3deg); background: var(--accent); }
+  .dropzone.dragover .dropzone-icon { transform: scale(1.08); background: var(--accent); }
+
+  .dropzone h3 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: 26px; line-height: 1.1;
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+  }
+  .dropzone-hint {
+    color: var(--mute); font-size: 14px;
+    max-width: 440px; line-height: 1.5;
+  }
+  .dropzone-hint b { color: var(--ink-2); font-weight: 600; }
+  .dropzone-actions {
+    margin-top: 18px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px;
+  }
+  .dropzone-action {
+    background: transparent; border: none; padding: 4px 2px;
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    color: var(--ink); cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    text-decoration-color: rgba(10, 10, 10, 0.18);
+    text-decoration-thickness: 1px;
+    transition: color 0.18s var(--ease), text-decoration-color 0.18s var(--ease);
+  }
+  .dropzone-action:hover {
+    color: var(--accent);
+    text-decoration-color: var(--accent);
+  }
+  .dropzone-divider { color: var(--mute-2); user-select: none; }
+  .dropzone input { display: none; }
+
+  /* ================ INSTRUCTIONS ================ */
+  .instructions {
+    margin-top: 32px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 28px 32px;
+  }
+  .instructions h4 {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--mute); margin-bottom: 20px;
+  }
+  .steps { display: grid; gap: 14px; }
+  .step { display: grid; grid-template-columns: 28px 1fr; gap: 14px; align-items: flex-start; font-size: 14px; line-height: 1.6; color: var(--ink-2); }
+  .step-num {
+    width: 22px; height: 22px;
+    border-radius: 999px;
+    background: var(--ink); color: var(--bg);
+    display: grid; place-items: center;
+    font-weight: 600; font-size: 11px;
+    margin-top: 3px;
+    font-family: ui-monospace, 'SF Mono', monospace;
+  }
+  .step b { font-weight: 600; color: var(--ink); }
+  .step code {
+    background: var(--surface);
+    padding: 1px 7px; border-radius: 5px;
+    font-size: 12px;
+    font-family: ui-monospace, 'SF Mono', monospace;
+    border: 1px solid var(--line);
+  }
+
+  /* ================ LOADING ================ */
+  .loading {
+    display: none; flex-direction: column; align-items: center; gap: 24px;
+    padding: 64px 24px; text-align: center;
+  }
+  .loading.active { display: flex; animation: fadeIn 0.4s var(--ease-out); }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .loading-orb {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, transparent, var(--ink) 90deg, var(--accent) 180deg, transparent 360deg);
+    animation: orbit 1.4s linear infinite;
+    position: relative;
+  }
+  .loading-orb::after {
+    content: '';
+    position: absolute; inset: 4px;
+    border-radius: 50%;
+    background: var(--bg);
+  }
+  @keyframes orbit { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-family: 'Instrument Serif', serif;
+    font-size: 24px;
+    font-style: italic;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  .loading-step { font-size: 13px; color: var(--mute); }
+
+  /* ================ STATS ================ */
+  .stats {
+    display: none;
+    grid-template-columns: repeat(4, 1fr);
+    margin-bottom: 40px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .stats.active { display: grid; animation: fadeUp 0.5s var(--ease-out); }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .stat {
+    padding: 24px 28px;
+    border-right: 1px solid var(--line-2);
+    position: relative;
+  }
+  .stat:last-child { border-right: none; }
+
+  .stat-label {
+    font-size: 11px; font-weight: 500;
+    color: var(--mute); text-transform: uppercase; letter-spacing: 0.12em;
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 14px;
+  }
+  .stat-label::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--mute);
+  }
+  .stat--accent .stat-label::before { background: var(--accent); }
+  .stat--success .stat-label::before { background: var(--success); }
+  .stat--warm .stat-label::before { background: var(--warm); }
+
+  .stat-value {
+    font-family: 'Instrument Serif', serif;
+    font-size: 44px; font-weight: 400; line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat--accent .stat-value { color: var(--accent); }
+  .stat--success .stat-value { color: var(--success); }
+
+  .stat-meta {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--mute);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .stat-meta strong { color: var(--accent); font-weight: 600; }
+
+  .stat-bar {
+    margin-top: 12px;
+    height: 3px; border-radius: 2px;
+    background: var(--line);
+    overflow: hidden;
+    position: relative;
+  }
+  .stat-bar-fill {
+    position: absolute; top: 0; left: 0; height: 100%;
+    background: var(--ink);
+    border-radius: 2px;
+    width: 0;
+    transition: width 1.2s var(--ease-out);
+  }
+  .stat--accent .stat-bar-fill { background: var(--accent); }
+  .stat--success .stat-bar-fill { background: var(--success); }
+
+  /* ================ RESULTS ================ */
+  .results { display: none; }
+  .results.active { display: block; animation: fadeUp 0.6s var(--ease-out) 0.1s both; }
+
+  .toolbar {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 20px; align-items: center;
+  }
+
+  .tabs {
+    display: flex; gap: 2px;
+    background: var(--surface);
+    padding: 4px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    flex: 1; min-width: 320px;
+    position: relative;
+    box-shadow: var(--shadow-xs);
+  }
+  .tab {
+    flex: 1; padding: 10px 14px;
+    background: transparent; border: none;
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    color: var(--mute); cursor: pointer;
+    border-radius: 10px;
+    transition: color 0.2s var(--ease);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    white-space: nowrap;
+    position: relative; z-index: 1;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--bg); }
+  .tab-indicator {
+    position: absolute; top: 4px; bottom: 4px;
+    background: var(--ink);
+    border-radius: 10px;
+    transition: left 0.4s var(--ease), width 0.4s var(--ease);
+    z-index: 0;
+    box-shadow: 0 2px 8px rgba(10, 10, 10, 0.15);
+  }
+  .tab-count {
+    font-size: 11px; padding: 1px 7px; border-radius: 999px;
+    background: var(--line);
+    color: var(--mute);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    transition: background 0.2s var(--ease), color 0.2s var(--ease);
+  }
+  .tab.active .tab-count { background: rgba(255, 255, 255, 0.18); color: var(--bg); }
+
+  .search-wrap {
+    position: relative;
+    flex: 1; min-width: 200px;
+  }
+  .search-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--mute);
+    pointer-events: none;
+  }
+  .search {
+    width: 100%;
+    padding: 12px 14px 12px 40px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    font-family: inherit; font-size: 14px;
+    color: var(--ink);
+    transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  }
+  .search:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 4px rgba(10, 10, 10, 0.06); }
+  .search::placeholder { color: var(--mute); }
+  .search-key {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-family: ui-monospace, 'SF Mono', monospace;
+    font-size: 10px;
+    background: var(--bg); border: 1px solid var(--line);
+    padding: 2px 6px; border-radius: 4px;
+    color: var(--mute);
+    pointer-events: none;
+  }
+
+  /* Menu */
+  .menu-wrap { position: relative; }
+  .menu {
+    position: absolute; right: 0; top: calc(100% + 8px);
+    min-width: 220px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 6px;
+    box-shadow: var(--shadow-lg);
+    opacity: 0; visibility: hidden;
+    transform: translateY(-8px);
+    transition: opacity 0.2s var(--ease), transform 0.2s var(--ease), visibility 0.2s;
+    z-index: 50;
+  }
+  .menu.open { opacity: 1; visibility: visible; transform: translateY(0); }
+  .menu-item {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%;
+    padding: 10px 12px; border-radius: 8px;
+    background: transparent; border: none;
+    font-family: inherit; font-size: 13px; color: var(--ink-2);
+    cursor: pointer; text-align: left;
+    transition: background 0.15s var(--ease);
+  }
+  .menu-item:hover { background: var(--bg); color: var(--ink); }
+  .menu-item.danger { color: var(--accent); }
+  .menu-item.danger:hover { background: var(--accent-soft); }
+  .menu-divider { height: 1px; background: var(--line); margin: 4px -6px; }
+  .menu-label { padding: 8px 12px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--mute); }
+  .menu-check { margin-left: auto; opacity: 0; }
+  .menu-item.is-active .menu-check { opacity: 1; }
+  .menu-item.is-active { color: var(--ink); font-weight: 500; }
+
+  /* ================ USER LIST ================ */
+  .user-list {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .user-list-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-2);
+    font-size: 12px;
+    color: var(--mute);
+  }
+  .user-list-header-info { display: flex; align-items: center; gap: 8px; }
+  .user-list-header strong { color: var(--ink); font-weight: 600; }
+  .bulk-actions {
+    margin-left: auto;
+    display: flex; gap: 6px;
+  }
+
+  .user-row {
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    align-items: center; gap: 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--line-2);
+    transition: background 0.18s var(--ease);
+    opacity: 0;
+    animation: rowIn 0.4s var(--ease-out) forwards;
+  }
+  @keyframes rowIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .user-row:last-child { border-bottom: none; }
+  .user-row:hover { background: var(--bg-grain); }
+  .user-row.is-new {
+    background: linear-gradient(90deg, var(--accent-soft) 0%, transparent 70%);
+  }
+  .user-row.is-new:hover { background: linear-gradient(90deg, var(--accent-soft-2) 0%, transparent 70%); }
+  .user-row.is-whitelisted { opacity: 0.45; }
+  .user-row.is-whitelisted:hover { opacity: 0.7; }
+
+  .user-row.is-exiting {
+    animation: rowExit 0.32s var(--ease) forwards;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  @keyframes rowExit {
+    0% { opacity: 1; transform: translateX(0); }
+    40% { opacity: 0; transform: translateX(24px); }
+    100% {
+      opacity: 0; transform: translateX(24px);
+      max-height: 0; padding-top: 0; padding-bottom: 0;
+      border-color: transparent;
+    }
+  }
+
+  .user-list.compact .user-row { padding: 8px 20px; gap: 12px; grid-template-columns: 32px 1fr auto; }
+  .user-list.compact .user-avatar { width: 32px; height: 32px; font-size: 12px; }
+  .user-list.compact .user-meta { display: none; }
+
+  .user-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: grid; place-items: center;
+    color: var(--bg); font-weight: 600; font-size: 16px;
+    flex-shrink: 0;
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    letter-spacing: -0.02em;
+  }
+
+  .user-info { min-width: 0; }
+  .user-name {
+    font-weight: 500; font-size: 15px;
+    display: flex; align-items: center; gap: 8px;
+    line-height: 1.2;
+  }
+  .user-name a {
+    color: var(--ink); text-decoration: none;
+    transition: color 0.18s var(--ease);
+  }
+  .user-name a:hover { color: var(--accent); }
+  .user-meta { font-size: 12px; color: var(--mute); margin-top: 3px; line-height: 1.4; }
+  .user-actions { display: flex; gap: 4px; align-items: center; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    line-height: 1.6;
+  }
+  .pill-new { background: var(--accent); color: var(--bg); }
+  .pill-old { background: var(--bg); color: var(--mute); border: 1px solid var(--line); }
+
+  .btn {
+    padding: 7px 12px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    font-family: inherit; font-size: 12px; font-weight: 500;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: background 0.15s var(--ease), border-color 0.15s var(--ease), color 0.15s var(--ease);
+    display: inline-flex; align-items: center; gap: 6px;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg); border-color: rgba(10, 10, 10, 0.16); color: var(--ink); }
+  .btn-icon { padding: 7px; }
+  .btn-primary {
+    background: var(--ink); color: var(--bg); border-color: var(--ink);
+  }
+  .btn-primary:hover { background: var(--ink-2); color: var(--bg); }
+  .btn-ghost { background: transparent; border-color: transparent; }
+  .btn-ghost:hover { background: var(--bg); border-color: var(--line); }
+  .btn[data-active='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn[data-active='true'] svg { stroke: var(--bg); }
+
+  .empty {
+    padding: 80px 24px; text-align: center;
+  }
+  .empty-icon {
+    width: 56px; height: 56px; margin: 0 auto 20px;
+    border-radius: 50%;
+    background: var(--surface-2); border: 1px solid var(--line);
+    display: grid; place-items: center; color: var(--mute);
+  }
+  .empty h4 {
+    font-family: 'Instrument Serif', serif;
+    font-size: 26px; font-weight: 400; font-style: italic;
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
+  }
+  .empty p { color: var(--mute); font-size: 14px; max-width: 360px; margin: 0 auto; line-height: 1.5; }
+
+  /* ================ FOOTER ================ */
+  footer {
+    margin-top: 80px;
+    padding-top: 32px;
+    border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 16px;
+    font-size: 13px; color: var(--mute);
+  }
+  footer a { color: var(--ink); text-decoration: none; font-weight: 500; transition: color 0.18s var(--ease); }
+  footer a:hover { color: var(--accent); }
+  .footer-left { display: flex; flex-direction: column; gap: 4px; }
+  .footer-projects { font-size: 12px; color: var(--mute-2); }
+  .footer-keys { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12px; }
+  .footer-keys kbd {
+    padding: 2px 6px; border-radius: 4px;
+    background: var(--surface); border: 1px solid var(--line);
+    font-family: ui-monospace, 'SF Mono', monospace;
+    font-size: 10px; color: var(--ink-2);
+    box-shadow: 0 1px 0 var(--line);
+  }
+
+  /* ================ TOAST ================ */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    background: var(--ink); color: var(--bg);
+    padding: 11px 18px; border-radius: 999px;
+    font-size: 13px; font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    transition: transform 0.4s var(--ease), opacity 0.3s;
+    opacity: 0; pointer-events: none;
+    z-index: 100;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .toast-icon { color: var(--success); display: inline-flex; }
+  .toast-action {
+    background: rgba(255, 255, 255, 0.14);
+    border: none;
+    color: var(--bg);
+    padding: 5px 11px;
+    border-radius: 8px;
+    font-family: inherit; font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    margin-left: 6px;
+    transition: background 0.15s var(--ease);
+  }
+  .toast-action:hover { background: rgba(255, 255, 255, 0.24); }
+  .toast-action[hidden] { display: none; }
+
+  /* Progress bar above the list */
+  .progress-row {
+    display: none;
+    align-items: center; gap: 12px;
+    padding: 12px 20px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+    font-size: 12px; color: var(--mute);
+  }
+  .progress-row.show { display: flex; }
+  .progress-bar {
+    flex: 1; height: 4px; border-radius: 2px;
+    background: var(--line); overflow: hidden;
+    position: relative;
+  }
+  .progress-bar-fill {
+    position: absolute; top: 0; left: 0; height: 100%;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--warm) 100%);
+    border-radius: 2px;
+    transition: width 0.4s var(--ease-out);
+  }
+  .progress-text { color: var(--ink-2); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .progress-text strong { color: var(--ink); font-weight: 600; }
+  .progress-restore {
+    background: transparent; border: none;
+    font-family: inherit; font-size: 12px; color: var(--mute);
+    cursor: pointer; padding: 0;
+    text-decoration: underline; text-underline-offset: 2px;
+    text-decoration-color: var(--mute-2);
+    transition: color 0.18s var(--ease);
+  }
+  .progress-restore:hover { color: var(--accent); text-decoration-color: var(--accent); }
+
+  /* ================ RESPONSIVE ================ */
+  @media (max-width: 880px) {
+    .hero { grid-template-columns: 1fr; gap: 32px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .stat { border-right: 1px solid var(--line-2); }
+    .stat:nth-child(2n) { border-right: none; }
+    .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line-2); }
+  }
+  @media (max-width: 640px) {
+    .container { padding: 24px 16px 64px; }
+    header { padding-bottom: 20px; margin-bottom: 36px; }
+    .brand-tag { display: none; }
+    .hero { margin-bottom: 40px; }
+    .dropzone { padding: 40px 24px; }
+    .instructions { padding: 22px 24px; }
+    .stat-value { font-size: 36px; }
+    .stat { padding: 18px 20px; }
+    .user-row { padding: 12px 16px; gap: 12px; grid-template-columns: 38px 1fr auto; }
+    .user-avatar { width: 38px; height: 38px; font-size: 14px; }
+    .tabs { flex-wrap: wrap; padding: 4px; }
+    .tab { flex: 1 1 calc(50% - 2px); }
+    .tab-indicator { display: none; }
+    .tab.active { background: var(--ink); }
+    .footer-keys { display: none; }
+    .search-key { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="brand">
+      <span class="brand-mark">IG</span>
+      <span class="brand-name">Checker</span>
+      <span class="brand-divider"></span>
+      <span class="brand-tag">Auditoría de Instagram</span>
+    </div>
+    <div class="header-actions">
+      <span class="pill-status">100% local</span>
+    </div>
+  </header>
+
+  <section class="hero" id="hero">
+    <div>
+      <div class="hero-eyebrow">Audita tu lista</div>
+      <h1>Quién <em>realmente</em> te sigue de vuelta.</h1>
+      <p class="hero-sub">Sube el export oficial de Instagram. Mirror compara tus listas y te muestra quién te sigue, quién no, y quién dejó de seguirte desde la última vez.</p>
+    </div>
+    <aside class="hero-side">
+      <div class="hero-fact">
+        <div class="hero-fact-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 12h10M12 7v10"/></svg>
+        </div>
+        <div class="hero-fact-text"><strong>Cero servidores.</strong> Tus datos nunca salen de este navegador. Procesamiento local con JavaScript puro.</div>
+      </div>
+      <div class="hero-fact">
+        <div class="hero-fact-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="hero-fact-text"><strong>Detección de cambios.</strong> Guarda un snapshot y la próxima vez te marcará quién dejó de seguirte.</div>
+      </div>
+      <div class="hero-fact">
+        <div class="hero-fact-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <div class="hero-fact-text"><strong>Whitelist personal.</strong> Marca cuentas que quieres ignorar (familia, marcas) y se separan del análisis.</div>
+      </div>
+    </aside>
+  </section>
+
+  <div class="error-card" id="errorCard"></div>
+
+  <section class="dropzone-card" id="uploadCard">
+    <label class="dropzone" id="dropzone">
+      <div class="dropzone-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+      </div>
+      <h3>Suelta tu archivo aquí</h3>
+      <p class="dropzone-hint">Arrastra el <b>ZIP</b> de Instagram, la <b>carpeta</b> descomprimida, o los <b>JSONs</b> sueltos.</p>
+      <div class="dropzone-actions">
+        <button type="button" class="dropzone-action" id="pickFilesBtn">Elegir archivos</button>
+        <span class="dropzone-divider">/</span>
+        <button type="button" class="dropzone-action" id="pickFolderBtn">una carpeta</button>
+      </div>
+      <input type="file" id="fileInput" accept=".zip,.json,application/zip,application/json" multiple />
+      <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none" />
+    </label>
+  </section>
+
+  <section class="instructions" id="instructions">
+    <h4>Cómo descargar tus datos de Instagram</h4>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>Abre Instagram → <b>Settings</b> → <b>Accounts Center</b> → <b>Your information and permissions</b> → <b>Download your information</b></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>Selecciona <b>Some of your information</b> → marca solo <b>Followers and following</b> para acelerar el export</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>En el formato escoge <code>JSON</code> (NO HTML) y rango <b>All time</b></div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div>Espera el correo de Instagram (10 min – 24h), descarga el ZIP y súbelo aquí</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="loading" id="loading">
+    <div class="loading-orb"></div>
+    <div>
+      <div class="loading-text" id="loadingText">Leyendo tu archivo</div>
+      <div class="loading-step" id="loadingStep">Descomprimiendo el ZIP...</div>
+    </div>
+  </div>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="results" id="results">
+    <div class="toolbar">
+      <div class="tabs" id="tabs">
+        <span class="tab-indicator" id="tabIndicator"></span>
+      </div>
+      <div class="search-wrap">
+        <span class="search-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input type="search" class="search" id="search" placeholder="Buscar usuario..." />
+        <span class="search-key">/</span>
+      </div>
+      <div class="menu-wrap">
+        <button class="icon-btn" id="menuBtn" title="Opciones">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+        </button>
+        <div class="menu" id="menu">
+          <div class="menu-label">Ordenar por</div>
+          <button class="menu-item is-active" data-sort="recent">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Más reciente
+            <svg class="menu-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="menu-item" data-sort="oldest">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Más antiguo
+            <svg class="menu-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="menu-item" data-sort="alpha">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13M3 12h13M3 18h7"/></svg>
+            Alfabético
+            <svg class="menu-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <div class="menu-divider"></div>
+          <div class="menu-label">Vista</div>
+          <button class="menu-item" data-view="compact">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            Vista compacta
+            <svg class="menu-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <div class="menu-divider"></div>
+          <button class="menu-item" id="exportCsv">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar como CSV
+          </button>
+          <button class="menu-item" id="copyAll">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copiar todos los handles
+          </button>
+          <div class="menu-divider"></div>
+          <button class="menu-item" id="loadAnother">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+            Cargar otro archivo
+          </button>
+          <button class="menu-item" id="restoreAll">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+            Restaurar procesados
+          </button>
+          <button class="menu-item danger" id="clearData">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+            Borrar snapshot guardado
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="user-list" id="userList"></div>
+  </section>
+
+  <footer>
+    <div class="footer-left">
+      <div>
+        Hecho por <a href="https://www.threads.com/@ronaldships" target="_blank" rel="noopener">@ronaldships</a> · <a href="https://github.com/curetcore/ig-checker" target="_blank" rel="noopener">★ GitHub</a>
+      </div>
+      <div class="footer-projects">
+        También construí <a href="https://linkship.cc" target="_blank" rel="noopener">Linkship</a> y <a href="https://karrito.shop" target="_blank" rel="noopener">Karrito</a>
+      </div>
+    </div>
+    <div class="footer-keys">
+      <span><kbd>/</kbd> buscar</span>
+      <span><kbd>1</kbd>–<kbd>4</kbd> tabs</span>
+      <span><kbd>Esc</kbd> reset</span>
+    </div>
+  </footer>
+</div>
+
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toastIcon">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+  </span>
+  <span id="toastMsg">Listo</span>
+  <button class="toast-action" id="toastAction" hidden>Deshacer</button>
+</div>
+
+<script>
+  const STORAGE_KEY = 'ig-checker-snapshot';
+  const WHITELIST_KEY = 'ig-checker-whitelist';
+  const HANDLED_KEY = 'ig-checker-handled';
+  const VIEW_KEY = 'ig-checker-view';
+
+  const PALETTE = ['#0a0a0a', '#ff3030', '#18a957', '#f59e0b', '#3b82f6', '#a855f7', '#ec4899', '#14b8a6'];
+  const colorFor = (s) => PALETTE[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTE.length];
+
+  const state = {
+    followers: new Map(),
+    following: new Map(),
+    notFollowingBack: [],
+    fans: [],
+    mutuals: [],
+    previousSnapshot: null,
+    activeTab: 'notFollowingBack',
+    search: '',
+    sort: 'recent',
+    compact: false,
+    whitelist: new Set(),
+    handled: new Set(),
+  };
+
+  /* ============ DOM ============ */
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const uploadCard = document.getElementById('uploadCard');
+  const instructions = document.getElementById('instructions');
+  const heroEl = document.getElementById('hero');
+  const loading = document.getElementById('loading');
+  const loadingText = document.getElementById('loadingText');
+  const loadingStep = document.getElementById('loadingStep');
+  const statsEl = document.getElementById('stats');
+  const resultsEl = document.getElementById('results');
+  const tabsEl = document.getElementById('tabs');
+  const tabIndicator = document.getElementById('tabIndicator');
+  const userListEl = document.getElementById('userList');
+  const searchEl = document.getElementById('search');
+  const menuBtn = document.getElementById('menuBtn');
+  const menu = document.getElementById('menu');
+  const errorCard = document.getElementById('errorCard');
+  const toast = document.getElementById('toast');
+  const toastMsg = document.getElementById('toastMsg');
+  const toastAction = document.getElementById('toastAction');
+
+  /* ============ Storage ============ */
+  const safeJSON = {
+    get(key) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; } },
+    set(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} },
+    remove(key) { try { localStorage.removeItem(key); } catch {} },
+  };
+
+  function loadPrefs() {
+    const wl = safeJSON.get(WHITELIST_KEY);
+    if (Array.isArray(wl)) state.whitelist = new Set(wl);
+    const hd = safeJSON.get(HANDLED_KEY);
+    if (Array.isArray(hd)) state.handled = new Set(hd);
+    state.compact = !!safeJSON.get(VIEW_KEY);
+    state.previousSnapshot = safeJSON.get(STORAGE_KEY);
+  }
+  function saveWhitelist() { safeJSON.set(WHITELIST_KEY, [...state.whitelist]); }
+  function saveHandled() { safeJSON.set(HANDLED_KEY, [...state.handled]); }
+  function saveView() { safeJSON.set(VIEW_KEY, state.compact); }
+  function saveSnapshot() {
+    safeJSON.set(STORAGE_KEY, {
+      timestamp: Date.now(),
+      followers: [...state.followers.keys()],
+      following: [...state.following.keys()],
+      notFollowingBack: state.notFollowingBack.map((u) => u.username),
+    });
+  }
+
+  /* ============ Toast / error ============ */
+  function showToast(msg, opts = {}) {
+    toastMsg.textContent = msg;
+    if (opts.action && typeof opts.onAction === 'function') {
+      toastAction.hidden = false;
+      toastAction.textContent = opts.action;
+      toastAction.onclick = () => {
+        opts.onAction();
+        toast.classList.remove('show');
+      };
+    } else {
+      toastAction.hidden = true;
+      toastAction.onclick = null;
+    }
+    toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toast.classList.remove('show'), opts.action ? 5000 : 2400);
+  }
+  function showError(msg) {
+    errorCard.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>${msg}</span>
+    `;
+    errorCard.classList.add('show');
+    setTimeout(() => errorCard.classList.remove('show'), 8000);
+  }
+
+  /* ============ File input ============ */
+  const folderInput = document.getElementById('folderInput');
+  const pickFolderBtn = document.getElementById('pickFolderBtn');
+  const pickFilesBtn = document.getElementById('pickFilesBtn');
+
+  dropzone.addEventListener('click', (e) => {
+    /* Inner buttons handle their own clicks */
+    if (e.target.closest('.dropzone-action')) return;
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length) handleFiles([...e.target.files]);
+  });
+  pickFilesBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fileInput.click();
+  });
+  pickFolderBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    folderInput.click();
+  });
+  folderInput?.addEventListener('change', (e) => {
+    if (e.target.files.length) handleFiles([...e.target.files]);
+  });
+
+  dropzone.addEventListener('mousemove', (e) => {
+    const r = dropzone.getBoundingClientRect();
+    dropzone.style.setProperty('--mx', ((e.clientX - r.left) / r.width) * 100 + '%');
+    dropzone.style.setProperty('--my', ((e.clientY - r.top) / r.height) * 100 + '%');
+  });
+  ['dragenter', 'dragover'].forEach((evt) => {
+    dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  });
+  ['dragleave', 'drop'].forEach((evt) => {
+    dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); });
+  });
+  dropzone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    /* Try DataTransferItem API for folders, fallback to flat files */
+    const items = e.dataTransfer.items;
+    if (items && items.length && items[0].webkitGetAsEntry) {
+      const files = [];
+      for (const item of items) {
+        const entry = item.webkitGetAsEntry();
+        if (entry) await collectEntries(entry, files);
+      }
+      if (files.length) handleFiles(files);
+      else if (e.dataTransfer.files.length) handleFiles([...e.dataTransfer.files]);
+    } else if (e.dataTransfer.files.length) {
+      handleFiles([...e.dataTransfer.files]);
+    }
+  });
+
+  function collectEntries(entry, out) {
+    return new Promise((resolve) => {
+      if (entry.isFile) {
+        entry.file((file) => {
+          /* preserve relative path so parser can find followers_and_following */
+          Object.defineProperty(file, 'relativePath', { value: entry.fullPath, configurable: true });
+          out.push(file);
+          resolve();
+        }, () => resolve());
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const readBatch = () => {
+          reader.readEntries(async (entries) => {
+            if (!entries.length) return resolve();
+            for (const e of entries) await collectEntries(e, out);
+            readBatch();
+          }, () => resolve());
+        };
+        readBatch();
+      } else resolve();
+    });
+  }
+
+  /* ============ Search ============ */
+  searchEl.addEventListener('input', (e) => {
+    state.search = e.target.value.toLowerCase().trim();
+    renderList();
+  });
+
+  /* ============ Menu ============ */
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menu.classList.toggle('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (!menu.contains(e.target) && !menuBtn.contains(e.target)) menu.classList.remove('open');
+  });
+
+  menu.querySelectorAll('[data-sort]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.sort = btn.dataset.sort;
+      menu.querySelectorAll('[data-sort]').forEach((b) => b.classList.toggle('is-active', b.dataset.sort === state.sort));
+      menu.classList.remove('open');
+      renderList();
+    });
+  });
+
+  document.querySelector('[data-view="compact"]').addEventListener('click', (e) => {
+    state.compact = !state.compact;
+    e.currentTarget.classList.toggle('is-active', state.compact);
+    saveView();
+    userListEl.classList.toggle('compact', state.compact);
+    menu.classList.remove('open');
+  });
+
+  document.getElementById('exportCsv').addEventListener('click', () => {
+    const list = getActiveList(false);
+    if (!list.length) { showToast('Lista vacía'); menu.classList.remove('open'); return; }
+    const csv = ['username,profile_url,followed_at',
+      ...list.map((u) => `${u.username},"${u.href}",${u.timestamp ? new Date(u.timestamp * 1000).toISOString() : ''}`)
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `mirror-${state.activeTab}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast(`Exportado ${list.length} usuarios`);
+    menu.classList.remove('open');
+  });
+
+  document.getElementById('copyAll').addEventListener('click', async () => {
+    const list = getActiveList(false);
+    if (!list.length) { showToast('Lista vacía'); menu.classList.remove('open'); return; }
+    const handles = list.map((u) => '@' + u.username).join(', ');
+    await navigator.clipboard.writeText(handles);
+    showToast(`Copiados ${list.length} handles`);
+    menu.classList.remove('open');
+  });
+
+  document.getElementById('loadAnother').addEventListener('click', () => {
+    resetUI();
+    menu.classList.remove('open');
+  });
+
+  document.getElementById('clearData').addEventListener('click', () => {
+    safeJSON.remove(STORAGE_KEY);
+    state.previousSnapshot = null;
+    state.notFollowingBack.forEach((u) => (u.isNew = false));
+    showToast('Snapshot borrado');
+    renderStats(false);
+    renderList();
+    menu.classList.remove('open');
+  });
+
+  document.getElementById('restoreAll').addEventListener('click', () => {
+    if (state.handled.size === 0) {
+      showToast('No hay usuarios procesados');
+      menu.classList.remove('open');
+      return;
+    }
+    const count = state.handled.size;
+    state.handled.clear();
+    saveHandled();
+    showToast(`${count} ${count === 1 ? 'usuario restaurado' : 'usuarios restaurados'}`);
+    renderStats(false);
+    renderTabs();
+    renderList();
+    menu.classList.remove('open');
+  });
+
+  /* ============ Keyboard ============ */
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') {
+      if (e.key === 'Escape') e.target.blur();
+      return;
+    }
+    if (e.key === '/') { e.preventDefault(); searchEl.focus(); return; }
+    if (e.key === 'Escape' && resultsEl.classList.contains('active')) { searchEl.value = ''; state.search = ''; renderList(); return; }
+    if (resultsEl.classList.contains('active')) {
+      const idx = parseInt(e.key);
+      const tabIds = ['notFollowingBack', 'fans', 'mutuals', 'whitelist'];
+      if (idx >= 1 && idx <= 4) {
+        state.activeTab = tabIds[idx - 1];
+        renderTabs();
+        renderList();
+      }
+    }
+  });
+
+  function resetUI() {
+    uploadCard.style.display = '';
+    instructions.style.display = '';
+    heroEl.style.display = '';
+    loading.classList.remove('active');
+    statsEl.classList.remove('active');
+    resultsEl.classList.remove('active');
+    fileInput.value = '';
+    searchEl.value = '';
+    state.search = '';
+    state.activeTab = 'notFollowingBack';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ============ File parsing ============ */
+  async function handleFiles(files) {
+    uploadCard.style.display = 'none';
+    instructions.style.display = 'none';
+    heroEl.style.display = 'none';
+    statsEl.classList.remove('active');
+    resultsEl.classList.remove('active');
+    loading.classList.add('active');
+    errorCard.classList.remove('show');
+
+    try {
+      const zipFile = files.find((f) => f.name.toLowerCase().endsWith('.zip'));
+      const jsonFiles = files.filter((f) => f.name.toLowerCase().endsWith('.json'));
+
+      if (zipFile) {
+        setLoadingStep('Leyendo tu archivo', 'Descomprimiendo el ZIP...');
+        await sleep(250);
+        const zip = await JSZip.loadAsync(zipFile);
+        setLoadingStep('Analizando datos', 'Buscando archivos JSON...');
+        await sleep(150);
+        await processZip(zip);
+      } else if (jsonFiles.length) {
+        setLoadingStep('Leyendo archivos', `${jsonFiles.length} JSON detectados...`);
+        await sleep(200);
+        await processJsonFiles(jsonFiles);
+      } else {
+        throw new Error('No detecté un archivo válido. Sube el ZIP de Instagram, la carpeta descomprimida, o los JSONs (following.json + followers_*.json).');
+      }
+    } catch (err) {
+      console.error(err);
+      showError(err.message || 'Error al procesar el archivo');
+      resetUI();
+    } finally {
+      loading.classList.remove('active');
+    }
+  }
+
+  /* Backwards-compat for any future single-file path */
+  function handleFile(f) { return handleFiles([f]); }
+
+  function setLoadingStep(text, step) {
+    loadingText.textContent = text;
+    loadingStep.textContent = step;
+  }
+
+  function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+  function findFiles(zip, predicate) {
+    return Object.keys(zip.files).filter((name) => predicate(name.toLowerCase()));
+  }
+
+  function fileNameOf(f) {
+    /* Preserve directory hint via webkitRelativePath or fallback to name */
+    return (f.webkitRelativePath || f.relativePath || f.name).toLowerCase();
+  }
+
+  async function processJsonFiles(files) {
+    const followingFile = files.find((f) => fileNameOf(f).endsWith('following.json'));
+    const followerFiles = files.filter((f) => /followers_\d+\.json$/.test(fileNameOf(f)));
+
+    if (!followingFile) {
+      throw new Error('Falta "following.json". Sube los archivos junto con following.json.');
+    }
+    if (!followerFiles.length) {
+      throw new Error('Faltan los "followers_*.json". Asegúrate de incluirlos junto con following.json.');
+    }
+
+    setLoadingStep('Procesando seguidos', 'Leyendo following.json...');
+    await sleep(180);
+    const followingJson = JSON.parse(await followingFile.text());
+    const followingArr = followingJson.relationships_following || followingJson;
+    state.following = new Map();
+    extractUsers(followingArr).forEach((u) => state.following.set(u.username, u));
+
+    setLoadingStep('Procesando seguidores', `Cargando ${followerFiles.length} archivo(s)...`);
+    await sleep(180);
+    state.followers = new Map();
+    for (const f of followerFiles) {
+      const json = JSON.parse(await f.text());
+      const arr = Array.isArray(json) ? json : (json.relationships_followers || []);
+      extractUsers(arr).forEach((u) => state.followers.set(u.username, u));
+    }
+
+    setLoadingStep('Comparando listas', `${state.following.size} seguidos vs ${state.followers.size} seguidores...`);
+    await sleep(280);
+
+    finalizeDiff();
+  }
+
+  function finalizeDiff() {
+    state.notFollowingBack = [...state.following.values()].filter((u) => !state.followers.has(u.username));
+    state.fans = [...state.followers.values()].filter((u) => !state.following.has(u.username));
+    state.mutuals = [...state.following.values()].filter((u) => state.followers.has(u.username));
+
+    if (state.previousSnapshot?.notFollowingBack) {
+      const prev = new Set(state.previousSnapshot.notFollowingBack);
+      state.notFollowingBack.forEach((u) => { u.isNew = !prev.has(u.username); });
+    }
+    saveSnapshot();
+    renderAll();
+  }
+
+  async function processZip(zip) {
+    const followingFile = findFiles(zip, (n) =>
+      n.endsWith('following.json') && n.includes('followers_and_following')
+    )[0];
+    const followerFiles = findFiles(zip, (n) =>
+      /followers_\d+\.json$/.test(n) && n.includes('followers_and_following')
+    );
+
+    if (!followingFile) throw new Error('No encontré "following.json" en el ZIP. Asegúrate de marcar "Followers and following" al exportar.');
+    if (!followerFiles.length) throw new Error('No encontré los archivos "followers_*.json" en el ZIP.');
+
+    setLoadingStep('Procesando seguidos', `${followerFiles.length + 1} archivos detectados...`);
+    await sleep(200);
+
+    const followingRaw = await zip.files[followingFile].async('string');
+    const followingJson = JSON.parse(followingRaw);
+    const followingArr = followingJson.relationships_following || followingJson;
+    state.following = new Map();
+    extractUsers(followingArr).forEach((u) => state.following.set(u.username, u));
+
+    setLoadingStep('Procesando seguidores', `Cargando ${followerFiles.length} archivo(s)...`);
+    await sleep(200);
+
+    state.followers = new Map();
+    for (const file of followerFiles) {
+      const raw = await zip.files[file].async('string');
+      const json = JSON.parse(raw);
+      const arr = Array.isArray(json) ? json : (json.relationships_followers || []);
+      extractUsers(arr).forEach((u) => state.followers.set(u.username, u));
+    }
+
+    setLoadingStep('Comparando listas', `${state.following.size} seguidos vs ${state.followers.size} seguidores...`);
+    await sleep(280);
+    finalizeDiff();
+  }
+
+  function extractUsers(arr) {
+    const users = [];
+    if (!Array.isArray(arr)) return users;
+    for (const item of arr) {
+      const data = item.string_list_data?.[0];
+      if (!data) continue;
+      /* In following.json: username is in item.title; in followers_*.json it's in data.value */
+      const username = data.value || item.title;
+      if (!username) continue;
+      /* Following.json has /_u/ in href; normalize to public profile URL */
+      let href = data.href || `https://www.instagram.com/${username}`;
+      href = href.replace('/_u/', '/');
+      users.push({
+        username,
+        href,
+        timestamp: data.timestamp || 0,
+      });
+    }
+    return users;
+  }
+
+  /* ============ Render ============ */
+  function renderAll() {
+    renderStats();
+    renderTabs();
+    renderList();
+    statsEl.classList.add('active');
+    resultsEl.classList.add('active');
+    userListEl.classList.toggle('compact', state.compact);
+    document.querySelector('[data-view="compact"]').classList.toggle('is-active', state.compact);
+  }
+
+  function animateNumber(el, target, duration = 1000) {
+    const start = performance.now();
+    const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+    function frame(now) {
+      const t = Math.min((now - start) / duration, 1);
+      el.textContent = Math.round(target * easeOut(t)).toLocaleString();
+      if (t < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function renderStats(animate = true) {
+    const newCount = state.notFollowingBack.filter((u) => u.isNew && !state.handled.has(u.username)).length;
+    const handledNFB = countHandledIn('notFollowingBack');
+    const visibleNFB = state.notFollowingBack.length - handledNFB;
+    const max = Math.max(state.following.size, state.followers.size, 1);
+    const ratio = state.following.size > 0 ? Math.round((state.mutuals.length / state.following.size) * 100) : 0;
+    const prevDate = state.previousSnapshot?.timestamp;
+    const prevText = prevDate
+      ? new Date(prevDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+      : null;
+
+    statsEl.innerHTML = `
+      <div class="stat">
+        <div class="stat-label">Sigues a</div>
+        <div class="stat-value" data-target="${state.following.size}">${animate ? 0 : state.following.size.toLocaleString()}</div>
+        <div class="stat-bar"><div class="stat-bar-fill" style="width: ${(state.following.size / max) * 100}%"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Te siguen</div>
+        <div class="stat-value" data-target="${state.followers.size}">${animate ? 0 : state.followers.size.toLocaleString()}</div>
+        <div class="stat-bar"><div class="stat-bar-fill" style="width: ${(state.followers.size / max) * 100}%"></div></div>
+      </div>
+      <div class="stat stat--accent">
+        <div class="stat-label">No te siguen</div>
+        <div class="stat-value" data-target="${visibleNFB}">${animate ? 0 : visibleNFB.toLocaleString()}</div>
+        ${handledNFB > 0
+          ? `<div class="stat-meta"><strong>${handledNFB}</strong> procesado${handledNFB === 1 ? '' : 's'}${newCount > 0 ? ' · +' + newCount + ' nuevos' : ''}</div>`
+          : newCount > 0
+            ? `<div class="stat-meta"><strong>+${newCount}</strong> nuevos${prevText ? ' desde ' + prevText : ''}</div>`
+            : `<div class="stat-meta">${state.following.size > 0 ? Math.round((state.notFollowingBack.length / state.following.size) * 100) + '% del total' : ''}</div>`}
+      </div>
+      <div class="stat stat--success">
+        <div class="stat-label">Mutuos</div>
+        <div class="stat-value" data-target="${state.mutuals.length}">${animate ? 0 : state.mutuals.length.toLocaleString()}</div>
+        <div class="stat-meta">${ratio}% reciprocidad</div>
+      </div>
+    `;
+
+    if (animate) {
+      requestAnimationFrame(() => {
+        statsEl.querySelectorAll('.stat-value').forEach((el) => {
+          animateNumber(el, parseInt(el.dataset.target));
+        });
+      });
+    }
+  }
+
+  function renderTabs() {
+    const tabs = [
+      { id: 'notFollowingBack', label: 'No te siguen', count: state.notFollowingBack.length - countHandledIn('notFollowingBack') },
+      { id: 'fans', label: 'Solo te siguen', count: state.fans.length - countHandledIn('fans') },
+      { id: 'mutuals', label: 'Mutuos', count: state.mutuals.length - countHandledIn('mutuals') },
+      { id: 'whitelist', label: 'Whitelist', count: state.whitelist.size },
+    ];
+    tabsEl.innerHTML = `<span class="tab-indicator" id="tabIndicator"></span>` +
+      tabs.map((t) => `
+        <button class="tab ${state.activeTab === t.id ? 'active' : ''}" data-tab="${t.id}">
+          <span>${t.label}</span>
+          <span class="tab-count">${t.count}</span>
+        </button>
+      `).join('');
+
+    tabsEl.querySelectorAll('.tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.activeTab = btn.dataset.tab;
+        renderTabs();
+        renderList();
+      });
+    });
+
+    requestAnimationFrame(() => {
+      const active = tabsEl.querySelector('.tab.active');
+      const indicator = tabsEl.querySelector('.tab-indicator');
+      if (active && indicator) {
+        indicator.style.left = active.offsetLeft + 'px';
+        indicator.style.width = active.offsetWidth + 'px';
+      }
+    });
+  }
+
+  function getActiveList(applyFilters = true) {
+    let list;
+    if (state.activeTab === 'notFollowingBack') list = [...state.notFollowingBack];
+    else if (state.activeTab === 'fans') list = [...state.fans];
+    else if (state.activeTab === 'mutuals') list = [...state.mutuals];
+    else if (state.activeTab === 'whitelist') {
+      const all = new Map([...state.following, ...state.followers]);
+      list = [...state.whitelist].map((u) => all.get(u) || { username: u, href: `https://www.instagram.com/${u}`, timestamp: 0 });
+    } else list = [];
+
+    /* Hide handled (already-processed) users — except in the whitelist tab where handled is irrelevant */
+    if (applyFilters && state.activeTab !== 'whitelist') {
+      list = list.filter((u) => !state.handled.has(u.username));
+    }
+
+    if (applyFilters && state.search) {
+      list = list.filter((u) => u.username.toLowerCase().includes(state.search));
+    }
+
+    if (state.sort === 'recent') list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    else if (state.sort === 'oldest') list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    else if (state.sort === 'alpha') list.sort((a, b) => a.username.localeCompare(b.username));
+
+    return list;
+  }
+
+  /* Count handled users in a given category (for stats / progress) */
+  function countHandledIn(category) {
+    let arr;
+    if (category === 'notFollowingBack') arr = state.notFollowingBack;
+    else if (category === 'fans') arr = state.fans;
+    else if (category === 'mutuals') arr = state.mutuals;
+    else return 0;
+    return arr.reduce((n, u) => n + (state.handled.has(u.username) ? 1 : 0), 0);
+  }
+
+  function renderList() {
+    const list = getActiveList();
+    if (!list.length) {
+      userListEl.innerHTML = `
+        <div class="empty">
+          <div class="empty-icon">
+            ${state.search
+              ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`
+              : state.activeTab === 'whitelist'
+                ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+                : `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+            }
+          </div>
+          <h4>${state.search ? 'Sin resultados' : state.activeTab === 'whitelist' ? 'Whitelist vacía' : 'Lista vacía'}</h4>
+          <p>${state.search
+              ? 'Ningún usuario coincide con tu búsqueda'
+              : state.activeTab === 'whitelist'
+                ? 'Marca cuentas con la estrella para mantenerlas fuera del análisis'
+                : 'No hay usuarios en esta categoría'
+            }</p>
+        </div>
+      `;
+      return;
+    }
+
+    /* Progress bar — only meaningful for active diff tabs (not whitelist) */
+    let progressHTML = '';
+    if (state.activeTab !== 'whitelist') {
+      const handledCount = countHandledIn(state.activeTab);
+      const totalCount = state.activeTab === 'notFollowingBack' ? state.notFollowingBack.length
+        : state.activeTab === 'fans' ? state.fans.length
+        : state.mutuals.length;
+      if (handledCount > 0 && totalCount > 0) {
+        const pct = Math.round((handledCount / totalCount) * 100);
+        progressHTML = `
+          <div class="progress-row show">
+            <div class="progress-text"><strong>${handledCount}</strong> de ${totalCount} procesados</div>
+            <div class="progress-bar"><div class="progress-bar-fill" style="width: ${pct}%"></div></div>
+            <button class="progress-restore" data-restore-all>Restaurar todo</button>
+          </div>
+        `;
+      }
+    }
+
+    const headerInfo = `
+      <div class="user-list-header">
+        <div class="user-list-header-info">
+          <strong>${list.length}</strong> ${list.length === 1 ? 'usuario' : 'usuarios'}
+          ${state.search ? `<span style="color: var(--mute-2)">·</span> filtrado` : ''}
+        </div>
+      </div>
+    `;
+
+    userListEl.innerHTML = progressHTML + headerInfo + list.map((u, i) => userRow(u, i)).join('');
+
+    /* Wire restore-all */
+    userListEl.querySelector('[data-restore-all]')?.addEventListener('click', () => {
+      const cat = state.activeTab;
+      const arr = cat === 'notFollowingBack' ? state.notFollowingBack
+        : cat === 'fans' ? state.fans
+        : state.mutuals;
+      arr.forEach((u) => state.handled.delete(u.username));
+      saveHandled();
+      showToast('Procesados restaurados');
+      renderStats(false);
+      renderTabs();
+      renderList();
+    });
+
+    userListEl.querySelectorAll('[data-whitelist]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const u = btn.dataset.whitelist;
+        if (state.whitelist.has(u)) {
+          state.whitelist.delete(u);
+          showToast(`@${u} removido de whitelist`);
+        } else {
+          state.whitelist.add(u);
+          showToast(`@${u} agregado a whitelist`);
+        }
+        saveWhitelist();
+        renderTabs();
+        renderList();
+      });
+    });
+    userListEl.querySelectorAll('[data-copy]').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await navigator.clipboard.writeText('@' + btn.dataset.copy);
+        showToast(`@${btn.dataset.copy} copiado`);
+      });
+    });
+    /* "Ver" link → opens IG in new tab AND marks user as handled (workflow: process & dismiss) */
+    userListEl.querySelectorAll('[data-dismiss]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const username = el.dataset.dismiss;
+        /* Don't preventDefault — let the link open IG in a new tab */
+        if (state.activeTab === 'whitelist') return;
+        dismissUser(username);
+      });
+    });
+  }
+
+  function dismissUser(username) {
+    if (state.handled.has(username)) return;
+    state.handled.add(username);
+    saveHandled();
+
+    const row = userListEl.querySelector(`[data-row="${escapeAttr(username)}"]`);
+    if (row) {
+      row.style.maxHeight = row.offsetHeight + 'px';
+      requestAnimationFrame(() => row.classList.add('is-exiting'));
+      setTimeout(() => {
+        renderStats(false);
+        renderTabs();
+        renderList();
+      }, 320);
+    } else {
+      renderStats(false);
+      renderTabs();
+      renderList();
+    }
+
+    showToast(`@${username} procesado`, {
+      action: 'Deshacer',
+      onAction: () => {
+        state.handled.delete(username);
+        saveHandled();
+        renderStats(false);
+        renderTabs();
+        renderList();
+      },
+    });
+  }
+
+  function escapeAttr(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function userRow(u, i) {
+    const initial = u.username.charAt(0).toUpperCase();
+    const isWhitelisted = state.whitelist.has(u.username);
+    const color = colorFor(u.username);
+    const date = u.timestamp
+      ? formatRelativeDate(u.timestamp * 1000)
+      : null;
+    const delay = Math.min(i * 0.012, 0.3);
+
+    const dismissAttr = state.activeTab === 'whitelist' ? '' : `data-dismiss="${escapeAttr(u.username)}"`;
+    const verTitle = state.activeTab === 'whitelist' ? 'Abrir perfil' : 'Abrir perfil y marcar como procesado';
+
+    return `
+      <div class="user-row ${u.isNew ? 'is-new' : ''} ${isWhitelisted ? 'is-whitelisted' : ''}" data-row="${escapeAttr(u.username)}" style="animation-delay: ${delay}s">
+        <div class="user-avatar" style="background: ${color}">${initial}</div>
+        <div class="user-info">
+          <div class="user-name">
+            <a href="${u.href}" target="_blank" rel="noopener">@${u.username}</a>
+            ${u.isNew ? '<span class="pill pill-new">Nuevo</span>' : ''}
+          </div>
+          ${date ? `<div class="user-meta">${date}</div>` : ''}
+        </div>
+        <div class="user-actions">
+          <button class="btn btn-icon btn-ghost" data-copy="${u.username}" title="Copiar @handle">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          </button>
+          <button class="btn btn-icon btn-ghost" data-whitelist="${u.username}" title="${isWhitelisted ? 'Quitar de whitelist' : 'Agregar a whitelist'}" data-active="${isWhitelisted}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="${isWhitelisted ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+          </button>
+          <a class="btn btn-primary" href="${u.href}" target="_blank" rel="noopener" ${dismissAttr} title="${verTitle}">
+            Ver
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 17L17 7" />
+              <path d="M7 7h10v10" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    `;
+  }
+
+  function formatRelativeDate(ts) {
+    const now = Date.now();
+    const diff = now - ts;
+    const days = Math.floor(diff / 86400000);
+    if (days < 1) return 'Hace menos de un día';
+    if (days < 7) return `Hace ${days} ${days === 1 ? 'día' : 'días'}`;
+    if (days < 30) {
+      const w = Math.floor(days / 7);
+      return `Hace ${w} ${w === 1 ? 'semana' : 'semanas'}`;
+    }
+    if (days < 365) {
+      const m = Math.floor(days / 30);
+      return `Hace ${m} ${m === 1 ? 'mes' : 'meses'}`;
+    }
+    const y = Math.floor(days / 365);
+    return `Hace ${y} ${y === 1 ? 'año' : 'años'}`;
+  }
+
+  /* ============ Init ============ */
+  loadPrefs();
+  if (state.previousSnapshot) {
+    const d = new Date(state.previousSnapshot.timestamp);
+    const formatted = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+    document.querySelector('.brand-tag').innerHTML = `Último análisis · <span style="color: var(--ink); font-weight: 500">${formatted}</span>`;
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Exports de Instagram (datos personales)
+*.zip
+instagram-*/
+followers_and_following/
+
+# Deploy
+.vercel
+.netlify
+
+# Dependencias (no debería haber, pero por si acaso)
+node_modules/
